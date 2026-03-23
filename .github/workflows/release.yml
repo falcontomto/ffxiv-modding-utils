@@ -1,34 +1,35 @@
-name: Release
+# .github/workflows/update-changelog.yaml
+name: "Update Changelog"
 
 on:
-  # This allows you to run the workflow manually from the Actions tab
-  workflow_dispatch:
-    inputs:
-      next-version:
-        description: 'Next Version (e.g., v1.0.2)'
-        required: true
+  release:
+    types: [released]
 
 jobs:
-  build:
+  update:
     runs-on: ubuntu-latest
 
+    permissions:
+      # Give the default GITHUB_TOKEN write permission to commit and push the 
+      # updated CHANGELOG back to the repository.
+      # https://github.blog/changelog/2023-02-02-github-actions-updating-the-default-github_token-permissions-to-read-only/
+      contents: write
+
     steps:
-      - name: Checkout Code
+      - name: Checkout code
         uses: actions/checkout@v4
         with:
-          # Important: Fetch all history if you're pushing tags/commits back
-          fetch-depth: 0
+          ref: ${{ github.event.release.target_commitish }}
 
       - name: Update Changelog
         uses: stefanzweifel/changelog-updater-action@v1
         with:
-          latest-version: ${{ github.event.inputs.next-version }}
+          latest-version: ${{ github.event.release.tag_name }}
+          release-notes: ${{ github.event.release.body }}
 
-      - name: Commit and Tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add CHANGELOG.md
-          git commit -m "chore: update CHANGELOG for ${{ github.event.inputs.next-version }}"
-          git tag ${{ github.event.inputs.next-version }}
-          git push origin main --tags
+      - name: Commit updated CHANGELOG
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          branch: ${{ github.event.release.target_commitish }}
+          commit_message: Update CHANGELOG
+          file_pattern: CHANGELOG.md
